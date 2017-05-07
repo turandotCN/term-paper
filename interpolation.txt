@@ -1,0 +1,84 @@
+using Interpolations
+using Gadfly
+using Plots
+using Distributions
+
+x=[-2;-1;-0.5;0;0.5;1;1.5;2;2.5]
+y=[102.00;92.00;85.00;75.00;66.00;63.00;66.00;73.00;80.00]
+xf=-2:0.01:2.5
+
+C=collect([6.43;1.36;0.31;0.08])
+
+x_even=collect([-2.00;-1.00;0.00;1.00;2.00])
+y_even=collect([102.00;92.00;75.00;63.00;73.00])
+
+#itp linear
+itp_linear= interpolate((x, ),y,Gridded(Linear()))
+y_linear= [itp_linear[x] for x in xf]
+l1=layer(x=xf, y=y_linear, Geom.line)
+l2=layer(x=x,y=y, Geom.point)
+plot(l1,l2)
+
+#itp constant
+itp_constant= interpolate((x, ),y,Gridded(Constant()))
+y_constant= [itp_constant[x] for x in xf]
+l3=layer(x=xf, y=y_constant, Geom.line)
+plot(l1,l2,l3)
+
+#itp cubic
+itp_cubic = interpolate(y_even, BSpline(Cubic(Line())), OnGrid())
+itp2 = scale(itp_cubic,-2:1:2)
+y_cubic= [itp2[x] for x in xf]
+l4=layer(x=xf, y=y_cubic, Geom.line)
+plot(l1,l2,l3,l4)
+
+#convert to price
+
+xstrikes=collect(linspace(-2,2.5,451))
+
+function price(BASE,MAT,STRIKE,T,VOL)
+
+M=MAT/BASE
+K=1+STRIKE
+V=VOL*sqrt(T)
+D=(M-K)/V
+d=Normal()
+C= ((M-K)*cdf(d,D) + V*pdf(d,D))*10000;
+end
+
+Price=zeros(451,1)
+for k = 1:length(xstrikes)
+Price[k] = price(99.793,100.30149, xstrikes[k]/100, 1, y_cubic[k]/10000)
+end
+
+
+plot(x=xstrikes, y=Price, Geom.line)
+
+#PDF
+
+PDF=zeros(450,1)
+for j=1:length(Price)-1
+PDF[j]= Price[j+1]-Price[j]
+end
+
+PDF2=zeros(449,1)
+for j=1:length(Price)-2
+PDF2[j]= PDF[j+1]-PDF[j]
+end
+
+plot(x=xstrikes[1:449], y=PDF2, Geom.line)
+
+
+
+#graphs for paper
+
+scatter(x_even, y_even, label="Observed volatilities")
+
+using Plots; scatter(x_even, y_even, label="Observed volatilities")
+plot!(xf, y_cubic, label="Cubic spline")
+
+using Plots; scatter(xstrikes, a, markersize=0)
+plot!(xstrikes, a, label="Continous call prices")
+
+using Plots; scatter(x_even, y_even, label="Observed volatilities")
+plot!(xf, y_linear, label="linear spline")

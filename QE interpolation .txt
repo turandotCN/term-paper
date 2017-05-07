@@ -1,0 +1,72 @@
+using Interpolations
+using Gadfly
+using Distributions
+
+K=collect([-2.00;-1.00;0.00;1.00;2.00])
+C=collect([6.43;1.36;0.31;0.08])
+KC=K=collect([1.00;1.50;2.00;2.50])
+T=collect([1;2])
+BASE=collect([100.083;99.989])
+MAT=collect([99.41454;99.9381])
+
+
+      VOL1= collect([110.00; 111.00; 104.00; 101.00; 104.00])
+      VOL2=collect([  85.00;91.00;89.00;103.00;119.00])
+
+
+xf=-2:0.01:2.5
+
+
+
+itp_cubic_1 = interpolate(VOL1, BSpline(Cubic(Line())), OnGrid())
+itp_cubic_2 = interpolate(VOL2, BSpline(Cubic(Line())), OnGrid())
+
+
+itp2_1 = scale(itp_cubic_1,-2:1:2)
+itp2_2 = scale(itp_cubic_2,-2:1:2)
+
+
+y_cubic_1= [itp2_1[x] for x in xf]
+y_cubic_2= [itp2_2[x] for x in xf]
+
+
+Y_CUBIC=collect([y_cubic_1 y_cubic_2])
+
+#convert to price
+
+xstrikes=collect(linspace(-2,2.5,451))
+
+function price(BASE,MAT,STRIKE,T,VOL)
+
+M=MAT/BASE
+K=1+STRIKE
+V=VOL*sqrt(T)
+D=(M-K)/V
+d=Normal()
+C= ((M-K)*cdf(d,D) + V*pdf(d,D))*10000;
+end
+
+Price=zeros(451,2)
+for k = 1:length(xstrikes), t=1:2
+Price[k,t] = price(BASE[t,1],MAT[t,1], xstrikes[k]/100, 1, Y_CUBIC[k,t]/10000)
+end
+
+#PDFs
+PDF=zeros(450,2)
+for j=1:size(Price)[1]-1, i=1:2
+PDF[j,i]= Price[j+1,i]-Price[j,i]
+end
+
+PDF2=zeros(449,2)
+for j=1:size(Price)[1]-2, i=1:2
+PDF2[j,i]= PDF[j+1,i]-PDF[j,i]
+end
+
+
+using Plots; scatter(xstrikes, a, markersize=0)
+plot!(xstrikes, PDF2, label="Continous call prices")
+
+
+plot(x=xstrikes[1:449], y=PDF2[:,1], Geom.line)
+
+
